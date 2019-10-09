@@ -3,6 +3,21 @@ import pickle
 import random
 import string
 
+import logging
+
+formatter = logging.Formatter('[%(asctime)s] [%(name)s] [%(levelname)s] %(message)s')
+
+
+def get_logger(name, level=logging.DEBUG):
+    logger = logging.getLogger(name)
+    logger.handlers.clear()
+    logger.setLevel(level)
+    ch = logging.StreamHandler()
+    ch.setLevel(level)
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
+    return logger
+
 
 CODE_INIT = 'init'
 CODE_POLL = 'poll'

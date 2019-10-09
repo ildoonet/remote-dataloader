@@ -7,6 +7,7 @@ import zmq
 import argparse
 import socket
 
+from dataloader import AugmentedDataset
 from remote_dataloader.common import random_string, byte_message, CODE_INIT, CODE_POLL
 
 if __name__ == '__main__':
@@ -22,14 +23,14 @@ if __name__ == '__main__':
     socket.connect("tcp://%s" % args.server)
 
     # request to initialization
-    socket.send(byte_message(myid, CODE_INIT, ''))
+    socket.send(byte_message(myid, CODE_INIT, ''), copy=False)
     fetcher = pickle.loads(socket.recv())
 
     print("Initialized.")
 
     jobid = data = None
     while True:
-        socket.send(byte_message(myid, CODE_POLL, (jobid, data)))
+        socket.send(byte_message(myid, CODE_POLL, (jobid, data)), copy=False)
 
         msg = pickle.loads(socket.recv())
         jobid = msg['message']    # list converted to string(eg. "[id1, id2, ...]")

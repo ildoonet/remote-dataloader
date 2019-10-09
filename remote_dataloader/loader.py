@@ -1,4 +1,5 @@
 import json
+import logging
 import pickle
 import time
 
@@ -6,7 +7,9 @@ import zmq
 from torch.utils.data.dataloader import _BaseDataLoaderIter, _DatasetKind, DataLoader
 from zmq.error import ZMQError
 
-from remote_dataloader.common import CODE_INIT, byte_message, CODE_POLL
+from remote_dataloader.common import CODE_INIT, byte_message, CODE_POLL, get_logger
+
+_logger = get_logger('RemoteDataLoader', level=logging.WARNING)
 
 
 class _ZmqDataLoaderIter(_BaseDataLoaderIter):
@@ -19,10 +22,18 @@ class _ZmqDataLoaderIter(_BaseDataLoaderIter):
         self.timeout = loader.timeout
         self.requested_queue = []
         self.received_result = {}
+        self.more_jobs = True
+        self.return_cnt = 0
+
+    def __iter__(self):
+        self.requested_queue = []
+        self.received_result = {}
+        self.more_jobs = True
+        self.return_cnt = 0
+        return super(_ZmqDataLoaderIter, self).__iter__(self)
 
     def __next__(self):
-        no_more_jobs = False
-        while not no_more_jobs or len(self.requested_queue) > 0:
+        while self.more_jobs or len(self.requested_queue) > 0:
             #  Wait for next request from client
             try:
                 message = self.socket.recv(zmq.NOBLOCK)
@@ -33,6 +44,7 @@ class _ZmqDataLoaderIter(_BaseDataLoaderIter):
                     if jobid in self.received_result:
                         self.requested_queue.pop(0)
                         data = self.received_result.pop(jobid)
+                        self.return_cnt += 1
                         return data
                 continue
 
@@ -44,24 +56,28 @@ class _ZmqDataLoaderIter(_BaseDataLoaderIter):
                 jobid, data = msg['message']
                 if jobid is not None:
                     self.received_result[jobid] = data
+
                 try:
                     request_t = self.requested_queue[0][1] if len(self.requested_queue) > 0 else -1
-                    if request_t > 0 and 0 < self.timeout < time.time() - request_t > 0:
+                    if request_t > 0 and 0 < self.timeout < time.time() - request_t:
                         jobid, request_t = self.requested_queue[0]
-                        self.requested_queue[0][1] = time.time()
-                    else:
+                        _logger.warning('task timeout, retry.')
+                        self.requested_queue[0][1] = time.time()    # override current time
+                    elif self.more_jobs:
                         jobid = str(self._next_index())
                         self.requested_queue.append([jobid, time.time()])
+                    else:
+                        jobid = None
                     cmd = byte_message('server', CODE_POLL, jobid)
                 except StopIteration:
                     cmd = byte_message('server', CODE_POLL, None)
-                    no_more_jobs = True
+                    self.more_jobs = False
             else:
                 raise ValueError('cannot process message: %s' % msg)
 
             # Send reply back to client
             self.socket.send(cmd)
-        raise StopIteration()
+        raise StopIteration
 
 
 class RemoteDataLoader(DataLoader):
