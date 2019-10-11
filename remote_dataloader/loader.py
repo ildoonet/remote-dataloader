@@ -18,6 +18,7 @@ class _ZmqDataLoaderIter(_BaseDataLoaderIter):
         self.dataset_fetcher = _DatasetKind.create_fetcher(self.dataset_kind, self.dataset, self.auto_collation, self.collate_fn, self.drop_last)
         self.pickled_fetcher = pickle.dumps(self.dataset_fetcher, protocol=pickle.HIGHEST_PROTOCOL)
 
+        self.listen = loader.listen
         self.socket = loader.socket
         self.timeout = loader.timeout
         self.requested_queue = []
@@ -58,10 +59,10 @@ class _ZmqDataLoaderIter(_BaseDataLoaderIter):
                     self.received_result[jobid] = data
 
                 try:
-                    request_t = self.requested_queue[0][1] if len(self.requested_queue) > 0 else -1
-                    if request_t > 0 and 0 < self.timeout < time.time() - request_t:
+                    request_id, request_t = self.requested_queue[0] if len(self.requested_queue) > 0 else (-1, -1)
+                    if request_t > 0 and 0 < self.timeout < time.time() - request_t and request_id not in self.received_result:
                         jobid, request_t = self.requested_queue[0]
-                        _logger.warning('task timeout, retry.')
+                        _logger.warning('task timeout, retry. socket=%s' % self.listen)
                         self.requested_queue[0][1] = time.time()    # override current time
                     elif self.more_jobs:
                         jobid = str(self._next_index())
@@ -93,6 +94,7 @@ class RemoteDataLoader(DataLoader):
         self.context = zmq.Context()
         self.socket = self.context.socket(zmq.REP)
         self.socket.bind("tcp://%s" % listen)
+        self.listen = listen
 
     def __iter__(self):
         return _ZmqDataLoaderIter(self)
