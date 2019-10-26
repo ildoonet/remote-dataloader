@@ -1,6 +1,6 @@
 import json
 import logging
-import pickle
+import dill as pickle
 import time
 
 import zmq
@@ -88,6 +88,7 @@ class RemoteDataLoader(DataLoader):
         super(RemoteDataLoader, self).__init__(dataset, batch_size, shuffle=shuffle, sampler=sampler,
                                                batch_sampler=batch_sampler, collate_fn=collate_fn, pin_memory=pin_memory,
                                                drop_last=drop_last)
+        _logger.info('RemoteDataLoader listen... %s' % listen)
 
         # socket
         self.timeout = timeout

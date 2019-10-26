@@ -1,3 +1,4 @@
 pyzmq==18.1.0
 argparse==1.4.0
 tqdm
+dill==0.3.1.1

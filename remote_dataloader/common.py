@@ -1,5 +1,5 @@
 import json
-import pickle
+import dill as pickle
 import random
 import string
 

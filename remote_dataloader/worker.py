@@ -1,14 +1,14 @@
 import ast
 import json
-import pickle
+import dill as pickle
 import time
 
 import zmq
 import argparse
 import socket
 
-from dataloader import AugmentedDataset
 from remote_dataloader.common import random_string, byte_message, CODE_INIT, CODE_POLL
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Process some integers.')
@@ -23,6 +23,7 @@ if __name__ == '__main__':
     socket.connect("tcp://%s" % args.server)
 
     # request to initialization
+    print("Request to initialize.")
     socket.send(byte_message(myid, CODE_INIT, ''), copy=False)
     fetcher = pickle.loads(socket.recv())
 
